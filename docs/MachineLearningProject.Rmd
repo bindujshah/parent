@@ -1,0 +1,117 @@
+---
+title: "Machine Learning Project"
+author: "Bindu Shah"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+
+This project is centerd on HAR (Human Actvity Recognition).
+
+It uses the Weight Lifting Exercises Dataset from the following website: http://groupware.les.inf.puc-rio.br/har 
+
+Background information obtained from the above-mentioned website.
+
+"This human activity recognition research has traditionally focused on discriminating between different activities, i.e. to predict "which" activity was performed at a specific point in time (like with the Daily Living Activities dataset above). The approach we propose for the Weight Lifting Exercises dataset is to investigate "how (well)" an activity was performed by the wearer. The "how (well)" investigation has only received little attention so far, even though it potentially provides useful information for a large variety of applications,such as sports training.
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).""
+
+
+
+## Load Training and Test data sets
+```{r}
+library(caret)
+training = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+
+testing = read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+dim(training)
+dim(testing)
+
+```
+
+## Exploratory Data Analysis
+
+Data Set has 160 variables - we need to review the data quality and nature of variables to see what variables should be eliminated
+summary(training) outout shows that there are data anomalies:
+a) variables that have only zero or mostly zero values
+
+b) NULL vales
+
+c) variables that are not material to the analysis 
+
+
+
+```{r Cleansing and Tidying data}
+
+nzv <- nearZeroVar(training)
+TidyTrain<-training[,-nzv]
+
+na<- sapply(TidyTrain, function(x) mean(is.na(x))) > 0.95
+TidyTrain<-TidyTrain[, na==F]
+
+
+TidyTrain<- TidyTrain[-c(grep("^raw_timestamp|^cvtd_timestamp|^new_window|^num_window|^user_name|X", names(TidyTrain)))]
+dim(TidyTrain)
+  
+```
+
+After eliminating anomalous and unnecessary columns, we have 1 outcome and 52 predictors left.
+
+I picked the Random Forest model with a k-fold cross-validation of 3. I selected Random Forests since it performs implicit feature selection.
+
+
+## Fit the model on training set
+```{r}
+Foldcv<-trainControl(method="cv", verbose=F, number =3)
+FitRF<-train(classe~., data=TidyTrain, method="rf", trControl=Foldcv)
+FitRF
+```
+
+The optimal model used 27 of the 52 predictors. Accuracy is 99.32% from 3-fold Cross Validation.
+
+
+```{r}
+# plot the random forest model
+plot(FitRF, lwd = 2, main = "Figure 1: Random Forest Accuracy", xlab = "Predictors", ylab = "Accuracy")
+```
+
+## Out of Sample Error Rate
+```{r}
+FitRF$finalModel
+```
+The Out of Sample Error Rate is 0.43%
+
+
+## Apply Model to Test Data Set
+```{r}
+TidyTest<-testing[,names(testing) %in% names(TidyTrain)]
+
+FitTestRF<-predict(FitRF, newdata=TidyTest)
+summary(FitTestRF)
+FitTestRF
+```
+
+FitTestRF now contains the predicted classe values for the 20 observations in the Test data set.
+
+
+
+
+## APPENDIX
+```{r}
+str(TidyTrain)
+```
+
+##  Acknowldgement
+Data for this project came from:
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+Read more: http://groupware.les.inf.puc-rio.br/har.#weight_lifting_exercises#ixzz4ZTwfgFJc
+
